@@ -2,10 +2,26 @@
 
 set -euo pipefail
 
-# TODO: Ensure this is the correct GitHub homepage where releases can be downloaded for longhornctl.
 GH_REPO="https://github.com/longhorn/cli"
 TOOL_NAME="longhornctl"
 TOOL_TEST="longhornctl help"
+
+get_arch() {
+	uname | tr '[:upper:]' '[:lower:]'
+}
+
+get_cpu() {
+	local machine_hardware_name
+	machine_hardware_name=${ASDF_TFSEC_OVERWRITE_ARCH:-"$(uname -m)"}
+
+	case "$machine_hardware_name" in
+	'x86_64') local cpu_type="amd64" ;;
+	'aarch64') local cpu_type="arm64" ;;
+	*) local cpu_type="$machine_hardware_name" ;;
+	esac
+
+	echo "$cpu_type"
+}
 
 fail() {
 	echo -e "asdf-$TOOL_NAME: $*"
@@ -31,18 +47,18 @@ list_github_tags() {
 }
 
 list_all_versions() {
-	# TODO: Adapt this. By default we simply list the tag names from GitHub releases.
-	# Change this function if longhornctl has other means of determining installable versions.
 	list_github_tags
 }
 
 download_release() {
-	local version filename url
+	local version filename url platform cpu
 	version="$1"
 	filename="$2"
 
-	# TODO: Adapt the release URL convention for longhornctl
-	url="$GH_REPO/archive/v${version}.tar.gz"
+	platform="$(get_arch)"
+	cpu=$(get_cpu)
+
+	url="$GH_REPO/releases/download/v${version}/$TOOL_NAME-${platform}-${cpu}"
 
 	echo "* Downloading $TOOL_NAME release $version..."
 	curl "${curl_opts[@]}" -o "$filename" -C - "$url" || fail "Could not download $url"
@@ -61,7 +77,6 @@ install_version() {
 		mkdir -p "$install_path"
 		cp -r "$ASDF_DOWNLOAD_PATH"/* "$install_path"
 
-		# TODO: Assert longhornctl executable exists.
 		local tool_cmd
 		tool_cmd="$(echo "$TOOL_TEST" | cut -d' ' -f1)"
 		test -x "$install_path/$tool_cmd" || fail "Expected $install_path/$tool_cmd to be executable."
